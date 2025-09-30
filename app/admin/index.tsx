@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Text, View, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { commonStyles, colors, buttonStyles } from '../../styles/commonStyles';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { dataStore } from '../../data/store';
 import { Space } from '../../types';
 import Icon from '../../components/Icon';
@@ -14,19 +14,37 @@ export default function AdminDashboard() {
   const currentUser = dataStore.getCurrentUser();
 
   useEffect(() => {
+    console.log('AdminDashboard mounted, current user:', currentUser);
     if (!currentUser || currentUser.role !== 'admin') {
+      console.log('User not admin, redirecting to home');
       router.replace('/');
       return;
     }
     loadSpaces();
   }, []);
 
+  // Refresh spaces when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('AdminDashboard focused, reloading spaces');
+      loadSpaces();
+    }, [])
+  );
+
   const loadSpaces = () => {
-    setSpaces(dataStore.getSpaces());
-    setDeletedSpaces(dataStore.getDeletedSpaces());
+    console.log('Loading spaces...');
+    const activeSpaces = dataStore.getSpaces();
+    const deletedSpacesList = dataStore.getDeletedSpaces();
+    
+    console.log('Active spaces count:', activeSpaces.length);
+    console.log('Deleted spaces count:', deletedSpacesList.length);
+    
+    setSpaces(activeSpaces);
+    setDeletedSpaces(deletedSpacesList);
   };
 
   const handleDeleteSpace = (spaceId: string) => {
+    console.log('Attempting to delete space:', spaceId);
     Alert.alert(
       'Delete Space',
       'Are you sure you want to delete this space? It will be moved to the recycle bin.',
@@ -39,6 +57,7 @@ export default function AdminDashboard() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
+            console.log('Deleting space:', spaceId);
             dataStore.deleteSpace(spaceId);
             loadSpaces();
           }
@@ -48,6 +67,7 @@ export default function AdminDashboard() {
   };
 
   const handleRestoreSpace = (spaceId: string) => {
+    console.log('Restoring space:', spaceId);
     dataStore.restoreSpace(spaceId);
     loadSpaces();
   };
@@ -113,7 +133,10 @@ export default function AdminDashboard() {
             <Text style={commonStyles.title}>Active Spaces ({spaces.length})</Text>
             <TouchableOpacity
               style={[buttonStyles.primary, { paddingHorizontal: 16, paddingVertical: 8 }]}
-              onPress={() => router.push('/admin/create-space')}
+              onPress={() => {
+                console.log('Navigating to create space');
+                router.push('/admin/create-space');
+              }}
             >
               <Text style={{ color: colors.backgroundAlt, fontSize: 14, fontWeight: '600' }}>
                 + New Space

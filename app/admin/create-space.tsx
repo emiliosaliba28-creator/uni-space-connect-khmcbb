@@ -29,30 +29,41 @@ export default function CreateSpace() {
   const [documents, setDocuments] = useState<DocumentFile[]>([]);
   const [links, setLinks] = useState<Link[]>([]);
   const [newLink, setNewLink] = useState({ title: '', url: '', description: '' });
+  const [isCreating, setIsCreating] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
+    console.log(`Input changed - ${field}: ${value}`);
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleAddPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
+    try {
+      console.log('Adding photo...');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets[0]) {
-      setPhotos(prev => [...prev, result.assets[0].uri]);
+      if (!result.canceled && result.assets[0]) {
+        console.log('Photo added:', result.assets[0].uri);
+        setPhotos(prev => [...prev, result.assets[0].uri]);
+      }
+    } catch (error) {
+      console.log('Error adding photo:', error);
+      Alert.alert('Error', 'Failed to add photo');
     }
   };
 
   const handleRemovePhoto = (index: number) => {
+    console.log('Removing photo at index:', index);
     setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleAddDocument = async () => {
     try {
+      console.log('Adding document...');
       const result = await DocumentPicker.getDocumentAsync({
         type: '*/*',
         copyToCacheDirectory: true,
@@ -66,6 +77,7 @@ export default function CreateSpace() {
           type: result.assets[0].mimeType || 'application/octet-stream',
           size: result.assets[0].size || 0,
         };
+        console.log('Document added:', doc.name);
         setDocuments(prev => [...prev, doc]);
       }
     } catch (error) {
@@ -75,10 +87,12 @@ export default function CreateSpace() {
   };
 
   const handleRemoveDocument = (id: string) => {
+    console.log('Removing document with id:', id);
     setDocuments(prev => prev.filter(doc => doc.id !== id));
   };
 
   const handleAddLink = () => {
+    console.log('Adding link:', newLink);
     if (newLink.title && newLink.url) {
       const link: Link = {
         id: Date.now().toString(),
@@ -88,51 +102,97 @@ export default function CreateSpace() {
       };
       setLinks(prev => [...prev, link]);
       setNewLink({ title: '', url: '', description: '' });
+      console.log('Link added successfully');
     } else {
       Alert.alert('Error', 'Please enter both title and URL');
     }
   };
 
   const handleRemoveLink = (id: string) => {
+    console.log('Removing link with id:', id);
     setLinks(prev => prev.filter(link => link.id !== id));
   };
 
-  const handleSave = () => {
-    if (!formData.name || !formData.number || !formData.managerName || !formData.managerEmail) {
-      Alert.alert('Error', 'Please fill in all required fields');
+  const handleSave = async () => {
+    console.log('Starting space creation...');
+    console.log('Form data:', formData);
+    
+    if (isCreating) {
+      console.log('Already creating space, ignoring duplicate request');
       return;
     }
 
-    const newSpace: Space = {
-      id: Date.now().toString(),
-      name: formData.name,
-      number: formData.number,
-      description: formData.description,
-      photos,
-      manager: {
-        name: formData.managerName,
-        email: formData.managerEmail,
-        phone: formData.managerPhone,
-      },
-      academicSupervisor: {
-        name: formData.supervisorName,
-        email: formData.supervisorEmail,
-        department: formData.supervisorDepartment,
-      },
-      accessRequirements: formData.accessRequirements,
-      documentation: documents,
-      links,
-      emergencyProcedures: formData.emergencyProcedures,
-      qrCode: JSON.stringify({ spaceId: Date.now().toString(), type: 'space' }),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isDeleted: false,
-    };
+    // Validate required fields
+    if (!formData.name || !formData.number || !formData.managerName || !formData.managerEmail) {
+      console.log('Validation failed - missing required fields');
+      Alert.alert('Error', 'Please fill in all required fields (Name, Number, Manager Name, Manager Email)');
+      return;
+    }
 
-    dataStore.addSpace(newSpace);
-    Alert.alert('Success', 'Space created successfully!', [
-      { text: 'OK', onPress: () => router.back() }
-    ]);
+    setIsCreating(true);
+
+    try {
+      // Generate unique ID for the space
+      const spaceId = `space_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('Generated space ID:', spaceId);
+
+      const newSpace: Space = {
+        id: spaceId,
+        name: formData.name,
+        number: formData.number,
+        description: formData.description,
+        photos,
+        manager: {
+          name: formData.managerName,
+          email: formData.managerEmail,
+          phone: formData.managerPhone,
+        },
+        academicSupervisor: {
+          name: formData.supervisorName,
+          email: formData.supervisorEmail,
+          department: formData.supervisorDepartment,
+        },
+        accessRequirements: formData.accessRequirements,
+        documentation: documents,
+        links,
+        emergencyProcedures: formData.emergencyProcedures,
+        qrCode: JSON.stringify({ spaceId: spaceId, type: 'space' }),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isDeleted: false,
+      };
+
+      console.log('Created space object:', {
+        id: newSpace.id,
+        name: newSpace.name,
+        number: newSpace.number,
+        managerName: newSpace.manager.name
+      });
+
+      // Add space to store
+      console.log('Adding space to store...');
+      dataStore.addSpace(newSpace);
+      
+      console.log('Space added successfully, showing success alert');
+      Alert.alert(
+        'Success', 
+        'Space created successfully!', 
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              console.log('Navigating back to admin dashboard');
+              router.back();
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.log('Error creating space:', error);
+      Alert.alert('Error', 'Failed to create space. Please try again.');
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -343,11 +403,15 @@ export default function CreateSpace() {
 
         <View style={{ paddingBottom: 40 }}>
           <TouchableOpacity
-            style={buttonStyles.primary}
+            style={[
+              buttonStyles.primary,
+              isCreating && { opacity: 0.6 }
+            ]}
             onPress={handleSave}
+            disabled={isCreating}
           >
             <Text style={{ color: colors.backgroundAlt, fontSize: 16, fontWeight: '600' }}>
-              Create Space
+              {isCreating ? 'Creating Space...' : 'Create Space'}
             </Text>
           </TouchableOpacity>
         </View>
