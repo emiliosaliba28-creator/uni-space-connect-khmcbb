@@ -45,21 +45,34 @@ export default function AdminDashboard() {
 
   const handleDeleteSpace = (spaceId: string) => {
     console.log('Attempting to delete space:', spaceId);
+    
+    // Find the space to get its name for the confirmation dialog
+    const space = spaces.find(s => s.id === spaceId);
+    const spaceName = space ? space.name : 'this space';
+    
     Alert.alert(
       'Delete Space',
-      'Are you sure you want to delete this space? It will be moved to the recycle bin.',
+      `Are you sure you want to delete "${spaceName}"? It will be moved to the recycle bin and can be restored later.`,
       [
         {
           text: 'Cancel',
-          style: 'cancel'
+          style: 'cancel',
+          onPress: () => console.log('Delete cancelled')
         },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            console.log('Deleting space:', spaceId);
-            dataStore.deleteSpace(spaceId);
-            loadSpaces();
+            try {
+              console.log('Confirming delete for space:', spaceId);
+              dataStore.deleteSpace(spaceId);
+              console.log('Space deleted successfully, reloading spaces');
+              loadSpaces();
+              Alert.alert('Success', `"${spaceName}" has been moved to the recycle bin.`);
+            } catch (error) {
+              console.error('Error deleting space:', error);
+              Alert.alert('Error', 'Failed to delete space. Please try again.');
+            }
           }
         }
       ]
@@ -67,9 +80,38 @@ export default function AdminDashboard() {
   };
 
   const handleRestoreSpace = (spaceId: string) => {
-    console.log('Restoring space:', spaceId);
-    dataStore.restoreSpace(spaceId);
-    loadSpaces();
+    console.log('Attempting to restore space:', spaceId);
+    
+    // Find the space to get its name for the confirmation dialog
+    const space = deletedSpaces.find(s => s.id === spaceId);
+    const spaceName = space ? space.name : 'this space';
+    
+    Alert.alert(
+      'Restore Space',
+      `Are you sure you want to restore "${spaceName}"?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => console.log('Restore cancelled')
+        },
+        {
+          text: 'Restore',
+          onPress: () => {
+            try {
+              console.log('Confirming restore for space:', spaceId);
+              dataStore.restoreSpace(spaceId);
+              console.log('Space restored successfully, reloading spaces');
+              loadSpaces();
+              Alert.alert('Success', `"${spaceName}" has been restored.`);
+            } catch (error) {
+              console.error('Error restoring space:', error);
+              Alert.alert('Error', 'Failed to restore space. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const SpaceCard = ({ space, isDeleted = false }: { space: Space; isDeleted?: boolean }) => (
@@ -81,25 +123,39 @@ export default function AdminDashboard() {
           <Text style={[commonStyles.textSecondary, { marginTop: 4 }]}>
             Manager: {space.manager.name}
           </Text>
+          {isDeleted && (
+            <Text style={[commonStyles.textSecondary, { marginTop: 4, color: colors.error }]}>
+              Deleted on: {new Date(space.updatedAt).toLocaleDateString()}
+            </Text>
+          )}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {!isDeleted && (
             <>
               <TouchableOpacity
                 style={{ padding: 8, marginRight: 8 }}
-                onPress={() => router.push(`/admin/space/${space.id}`)}
+                onPress={() => {
+                  console.log('Navigating to space view:', space.id);
+                  router.push(`/admin/space/${space.id}`);
+                }}
               >
                 <Icon name="eye" size={20} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={{ padding: 8, marginRight: 8 }}
-                onPress={() => router.push(`/admin/edit-space/${space.id}`)}
+                onPress={() => {
+                  console.log('Navigating to edit space:', space.id);
+                  router.push(`/admin/edit-space/${space.id}`);
+                }}
               >
                 <Icon name="create" size={20} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={{ padding: 8 }}
-                onPress={() => handleDeleteSpace(space.id)}
+                onPress={() => {
+                  console.log('Delete button pressed for space:', space.id);
+                  handleDeleteSpace(space.id);
+                }}
               >
                 <Icon name="trash" size={20} color={colors.error} />
               </TouchableOpacity>
@@ -108,7 +164,10 @@ export default function AdminDashboard() {
           {isDeleted && (
             <TouchableOpacity
               style={{ padding: 8 }}
-              onPress={() => handleRestoreSpace(space.id)}
+              onPress={() => {
+                console.log('Restore button pressed for space:', space.id);
+                handleRestoreSpace(space.id);
+              }}
             >
               <Icon name="refresh" size={20} color={colors.success} />
             </TouchableOpacity>
@@ -161,6 +220,9 @@ export default function AdminDashboard() {
         {deletedSpaces.length > 0 && (
           <View style={commonStyles.section}>
             <Text style={commonStyles.title}>Recycle Bin ({deletedSpaces.length})</Text>
+            <Text style={[commonStyles.textSecondary, { marginBottom: 16 }]}>
+              Deleted spaces can be restored from here.
+            </Text>
             {deletedSpaces.map(space => (
               <SpaceCard key={space.id} space={space} isDeleted={true} />
             ))}

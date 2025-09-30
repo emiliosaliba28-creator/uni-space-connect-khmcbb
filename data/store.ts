@@ -27,14 +27,37 @@ class DataStore {
   }
 
   updateSpace(spaceId: string, updates: Partial<Space>) {
-    const index = this.spaces.findIndex(s => s.id === spaceId);
-    if (index !== -1) {
-      this.spaces[index] = { ...this.spaces[index], ...updates, updatedAt: new Date().toISOString() };
-      console.log('Space updated:', spaceId);
+    console.log('Attempting to update space:', spaceId);
+    
+    // First check active spaces
+    const activeIndex = this.spaces.findIndex(s => s.id === spaceId);
+    if (activeIndex !== -1) {
+      this.spaces[activeIndex] = { 
+        ...this.spaces[activeIndex], 
+        ...updates, 
+        updatedAt: new Date().toISOString() 
+      };
+      console.log('Active space updated:', spaceId);
+      return;
     }
+
+    // Then check deleted spaces (in case we're editing a deleted space before restoring)
+    const deletedIndex = this.deletedSpaces.findIndex(s => s.id === spaceId);
+    if (deletedIndex !== -1) {
+      this.deletedSpaces[deletedIndex] = { 
+        ...this.deletedSpaces[deletedIndex], 
+        ...updates, 
+        updatedAt: new Date().toISOString() 
+      };
+      console.log('Deleted space updated:', spaceId);
+      return;
+    }
+
+    console.warn('Space not found for update:', spaceId);
   }
 
   deleteSpace(spaceId: string) {
+    console.log('Attempting to delete space:', spaceId);
     const spaceIndex = this.spaces.findIndex(s => s.id === spaceId);
     if (spaceIndex !== -1) {
       const space = this.spaces[spaceIndex];
@@ -42,11 +65,14 @@ class DataStore {
       space.updatedAt = new Date().toISOString();
       this.deletedSpaces.push(space);
       this.spaces.splice(spaceIndex, 1);
-      console.log('Space deleted:', spaceId);
+      console.log('Space deleted and moved to recycle bin:', spaceId);
+    } else {
+      console.warn('Space not found for deletion:', spaceId);
     }
   }
 
   restoreSpace(spaceId: string) {
+    console.log('Attempting to restore space:', spaceId);
     const spaceIndex = this.deletedSpaces.findIndex(s => s.id === spaceId);
     if (spaceIndex !== -1) {
       const space = this.deletedSpaces[spaceIndex];
@@ -54,7 +80,9 @@ class DataStore {
       space.updatedAt = new Date().toISOString();
       this.spaces.push(space);
       this.deletedSpaces.splice(spaceIndex, 1);
-      console.log('Space restored:', spaceId);
+      console.log('Space restored from recycle bin:', spaceId);
+    } else {
+      console.warn('Space not found for restoration:', spaceId);
     }
   }
 
@@ -67,7 +95,34 @@ class DataStore {
   }
 
   getSpaceById(id: string): Space | null {
-    return this.spaces.find(s => s.id === id && !s.isDeleted) || null;
+    // First check active spaces
+    const activeSpace = this.spaces.find(s => s.id === id && !s.isDeleted);
+    if (activeSpace) {
+      console.log('Found active space:', id);
+      return activeSpace;
+    }
+
+    // Then check deleted spaces (for editing purposes)
+    const deletedSpace = this.deletedSpaces.find(s => s.id === id);
+    if (deletedSpace) {
+      console.log('Found deleted space:', id);
+      return deletedSpace;
+    }
+
+    console.warn('Space not found:', id);
+    return null;
+  }
+
+  // Permanently delete a space (remove from recycle bin)
+  permanentlyDeleteSpace(spaceId: string) {
+    console.log('Permanently deleting space:', spaceId);
+    const spaceIndex = this.deletedSpaces.findIndex(s => s.id === spaceId);
+    if (spaceIndex !== -1) {
+      this.deletedSpaces.splice(spaceIndex, 1);
+      console.log('Space permanently deleted:', spaceId);
+    } else {
+      console.warn('Space not found in recycle bin for permanent deletion:', spaceId);
+    }
   }
 
   // Mock data for development
